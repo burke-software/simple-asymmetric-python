@@ -10,7 +10,7 @@ from .aes import AESCipher
 class AsymCrypt():
     def __init__(self, aes_key=None, public_key=None, private_key=None):
         if aes_key:
-            self.aes_cipher = AESCipher(aes_key)
+            self.set_aes_key(aes_key)
         self.set_public_key(public_key)
         self.set_private_key(private_key)
 
@@ -95,7 +95,16 @@ class AsymCrypt():
         return self.public_key
 
     def set_aes_key(self, aes_key):
+        self.aes_key = aes_key
         self.aes_cipher = AESCipher(aes_key)
+
+    def set_aes_key_from_encrypted(self, ciphertext):
+        aes_key = self.rsa_decrypt(ciphertext)
+        self.set_aes_key(aes_key)
+
+    def get_encrypted_aes_key(self, public_key):
+        public_asym = AsymCrypt(public_key=public_key)
+        return public_asym.rsa_encrypt(self.aes_key)
 
     def make_aes_key(self):
         """ Generate a new AES key and return it. """
