@@ -1,10 +1,11 @@
-from Crypto.Cipher import PKCS1_OAEP
-from Crypto.PublicKey import RSA
-import hashlib
 import base64
 import random
 import string
-from .aes import AESCipher
+
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.backends import default_backend
 
 
 class AsymCrypt():
@@ -14,17 +15,19 @@ class AsymCrypt():
         self.set_public_key(public_key)
         self.set_private_key(private_key)
 
-    def _get_rsa_cipher(self):
-        if self.private_key:
-            return PKCS1_OAEP.new(self.private_key)
-        return PKCS1_OAEP.new(self.public_key)
+    def _get_padding(self):
+        return padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA1()),
+            algorithm=hashes.SHA1(),
+            label=None
+        )
 
     def _random_string(self, N):
-        return ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(N))
+        return ''.join(random.SystemRandom().choice(
+            string.ascii_uppercase + string.digits) for _ in range(N))
 
-    def _generate_key(self, N=255):
-        key = self._random_string(N)
-        return hashlib.sha256(key.encode()).digest()
+    def _generate_key(self):
+        return Fernet.generate_key()
 
     def _generate_passphrase(self, N=255):
         return self._random_string(N)
@@ -42,10 +45,30 @@ class AsymCrypt():
         version if set
         bits: Bits for pycrypto's generate function. Safe to ignore.
         return tuple of string version of keys (private, public) """
-        self.private_key = RSA.generate(bits)
-        self.public_key = self.private_key.publickey()
-        private = self.private_key.exportKey(passphrase=passphrase)
-        public = self.public_key.exportKey()
+        self.private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=bits,
+            backend=default_backend()
+        )
+        self.public_key = self.private_key.public_key()
+
+        if passphrase:
+            encryption_alg = serialization.BestAvailableEncryption(
+                passphrase.encode()
+            )
+        else:
+            encryption_alg = serialization.NoEncryption()
+
+        private = self.private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=encryption_alg
+        )
+
+        public = self.public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
         return private, public
 
     def make_rsa_keys_with_passphrase(self, bits=4096):
@@ -61,42 +84,57 @@ class AsymCrypt():
         convenience)
         """
         text = self._force_bytes(text)
-        cipher = self._get_rsa_cipher()
-        ciphertext = cipher.encrypt(text)
+        ciphertext = self.public_key.encrypt(
+            text,
+            self._get_padding()
+        )
         if use_base64 is True:
             ciphertext = base64.b64encode(ciphertext).decode()
         return ciphertext
 
     def rsa_decrypt(self, ciphertext, use_base64=False):
-        cipher = self._get_rsa_cipher()
         if use_base64 is True:
             ciphertext = base64.b64decode(ciphertext)
-        return cipher.decrypt(ciphertext)
+        return self.private_key.decrypt(
+            ciphertext,
+            self._get_padding()
+        )
 
     def set_private_key(self, private_key, passphrase=None):
         """ Set private key
-        private_key: String or RSA key object
+        private_key: String or RSAPrivateKey object
         passphrase: Optional passphrase for encrpyting the RSA private key
         """
-        if isinstance(private_key, str):
-            self.private_key = RSA.importKey(private_key, passphrase=passphrase)
+        if isinstance(private_key, (bytes, str)):
+            private_key = self._force_bytes(private_key)
+            if passphrase:
+                passphrase = self._force_bytes(passphrase)
+            self.private_key = serialization.load_pem_private_key(
+                private_key,
+                password=passphrase,
+                backend=default_backend()
+            )
         else:
             self.private_key = private_key
         return self.private_key
 
     def set_public_key(self, public_key):
         """ Set public key
-        public_key: String or RSA key object
+        public_key: String or RSAPublicKey object
         """
-        if isinstance(public_key, str):
-            self.public_key = RSA.importKey(public_key)
+        if isinstance(public_key, (bytes, str)):
+            public_key = self._force_bytes(public_key)
+            self.public_key = serialization.load_pem_public_key(
+                public_key,
+                backend=default_backend()
+            )
         else:
             self.public_key = public_key
         return self.public_key
 
     def set_aes_key(self, aes_key):
         self.aes_key = aes_key
-        self.aes_cipher = AESCipher(aes_key)
+        self.aes_cipher = Fernet(self.aes_key)
 
     def set_aes_key_from_encrypted(self, ciphertext):
         aes_key = self.rsa_decrypt(ciphertext)
@@ -116,6 +154,7 @@ class AsymCrypt():
         """ Encrypt text using combined RSA + AES encryption.
         Requires public_key and aes_key to be set. aes_key may be generated with
         AsymCrypt.make_aes_key if you do not already have one."""
+        text = self._force_bytes(text)
         return self.aes_cipher.encrypt(text)
 
     def decrypt(self, text):

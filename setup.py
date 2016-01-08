@@ -18,6 +18,6 @@ setup(
         'Intended Audience :: Developers',
     ],
     install_requires=[
-        'pycrypto',
+        'cryptography',
     ]
 )
