@@ -6,15 +6,13 @@ Currently a work in progress and not publically vetted. Do not use unless you wi
 
 # To do
 
-- Document public functions
 - Get code peer reviewed
-- Make friendly exceptions
 - Set up travis CI
 - Port to javascript (with feature parity and interoperability)
 
 # Installation
 
-TODO 
+Will place on pypi soon 
 
 `pip install simple-asymmetric`
 
