@@ -19,5 +19,6 @@ setup(
     ],
     install_requires=[
         'cryptography',
-    ]
+    ],
+    test_suite="tests",
 )
