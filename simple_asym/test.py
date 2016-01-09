@@ -1,5 +1,7 @@
 import unittest
 from .asymmetric_encryption import AsymCrypt
+from .exceptions import (
+    MissingAESException, MissingRSAPrivateException, MissingRSAPublicException)
 
 
 class TestAsymCrypt(unittest.TestCase):
@@ -40,3 +42,18 @@ class TestAsymCrypt(unittest.TestCase):
         asym = AsymCrypt()
         asym.set_private_key(private, passphrase=passphrase)
         self.assertTrue(self.private_key)
+
+    def test_exceptions(self):
+        asym = AsymCrypt()
+
+        with self.assertRaises(MissingAESException):
+            asym.encrypt('foo')
+
+        with self.assertRaises(MissingAESException):
+            asym.decrypt('foo')
+
+        with self.assertRaises(MissingRSAPublicException):
+            asym.rsa_encrypt('foo')
+
+        with self.assertRaises(MissingRSAPrivateException):
+            asym.rsa_decrypt('foo')

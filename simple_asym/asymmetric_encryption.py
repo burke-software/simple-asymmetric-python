@@ -7,9 +7,21 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.backends import default_backend
 
+from .exceptions import (
+    MissingAESException, MissingRSAPrivateException, MissingRSAPublicException)
+
 
 class AsymCrypt():
+    aes_cipher = None
+
     def __init__(self, aes_key=None, public_key=None, private_key=None):
+        """ A class to encrypt and decrypt using Asymmetrical encryption.
+        All kwargs are optional.
+
+        :param aes_key: AES key used for symmetric encryption
+        :param public_key: Public RSA key used for asymmetric encryption
+        "param private_key: Private RSA key used for asmmetric decryption
+        """
         if aes_key:
             self.set_aes_key(aes_key)
         self.set_public_key(public_key)
@@ -41,10 +53,11 @@ class AsymCrypt():
 
     def make_rsa_keys(self, passphrase=None, bits=4096):
         """ Create new rsa private and public keys
-        passphrase: Optional RSA private key passphrase. Returns encrypted
+
+        :param passphrase: Optional RSA private key passphrase. Returns encrypted
         version if set
-        bits: Bits for pycrypto's generate function. Safe to ignore.
-        return tuple of string version of keys (private, public) """
+        :param bits: Bits for pycrypto's generate function. Safe to ignore.
+        :rtype: tuple of string version of keys (private, public) """
         self.private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=bits,
@@ -73,17 +86,25 @@ class AsymCrypt():
 
     def make_rsa_keys_with_passphrase(self, bits=4096):
         """ Wrapper around make_rsa_keys that also generates a passphrase
-        Returns (private, public, passphrase) """
+
+        :param bits: Bits for pycrypto's generate function. Safe to ignore.
+        :rtype: tuple (private, public, passphrase) """
         passphrase = self._generate_passphrase()
         private, public = self.make_rsa_keys(passphrase=passphrase, bits=bits)
         return private, public, passphrase
 
     def rsa_encrypt(self, text, use_base64=False):
-        """ Return ciphertext of plain text
-        use_base64: set True to return a base64 encoded unicode string (just for
-        convenience)
+        """ Convert plain text to ciphertext
+
+        :param text: Plaintext to encrypt
+        :param use_base64: set True to return a base64 encoded unicode string
+        (just for convenience)
+        :type use_base64: Boolean
+        :rtype: ciphertext string
         """
         text = self._force_bytes(text)
+        if not self.public_key:
+            raise MissingRSAPublicException
         ciphertext = self.public_key.encrypt(
             text,
             self._get_padding()
@@ -93,8 +114,19 @@ class AsymCrypt():
         return ciphertext
 
     def rsa_decrypt(self, ciphertext, use_base64=False):
+        """ Convert ciphertext into plaintext
+
+        :param ciphertext: Ciphertext to decrypt
+        :param use_base64: set True to return a base64 encoded unicode string
+        (just for convenience)
+        :type use_base64: Boolean
+        :rtype: plaintext string
+        """
+
         if use_base64 is True:
             ciphertext = base64.b64decode(ciphertext)
+        if not self.private_key:
+            raise MissingRSAPrivateException
         return self.private_key.decrypt(
             ciphertext,
             self._get_padding()
@@ -102,8 +134,10 @@ class AsymCrypt():
 
     def set_private_key(self, private_key, passphrase=None):
         """ Set private key
-        private_key: String or RSAPrivateKey object
-        passphrase: Optional passphrase for encrpyting the RSA private key
+
+        :param private_key: String or RSAPrivateKey object
+        :param passphrase: Optional passphrase for encrpyting the RSA private key
+        :rtype: private key
         """
         if isinstance(private_key, (bytes, str)):
             private_key = self._force_bytes(private_key)
@@ -120,7 +154,9 @@ class AsymCrypt():
 
     def set_public_key(self, public_key):
         """ Set public key
-        public_key: String or RSAPublicKey object
+
+        :param public_key: String or RSAPublicKey object
+        :rtype: public key
         """
         if isinstance(public_key, (bytes, str)):
             public_key = self._force_bytes(public_key)
@@ -145,23 +181,36 @@ class AsymCrypt():
         return public_asym.rsa_encrypt(self.aes_key)
 
     def make_aes_key(self):
-        """ Generate a new AES key and return it. """
+        """ Generate a new AES key
+
+        :rtype: AES key string
+        """
         key = self._generate_key()
         self.set_aes_key(key)
         return key
 
     def encrypt(self, text):
-        """ Encrypt text using combined RSA + AES encryption.
+        """ Encrypt text using AES encryption.
         Requires public_key and aes_key to be set. aes_key may be generated with
-        AsymCrypt.make_aes_key if you do not already have one."""
+        AsymCrypt.make_aes_key if you do not already have one.
+
+        :param text: text to encrypt
+        :rtype: ciphertext string
+        """
         text = self._force_bytes(text)
+        if not self.aes_cipher:
+            raise MissingAESException
         return self.aes_cipher.encrypt(text)
 
     def decrypt(self, text):
-        """ Decrypt ciphertext using combined RSA + AES encrpytion.
+        """ Decrypt ciphertext using AES encrpytion.
         Requires private_key and aes_key to be set. aes_key may have been
-        generated with
-        AsymCrypt.make_aes_key which should have been done at time or
-        encryption.
+        generated with AsymCrypt.make_aes_key which should have been done at
+        time or encryption.
+
+        :param text: ciphertext to decrypt
+        :rtype: decrypted text string
         """
+        if not self.aes_cipher:
+            raise MissingAESException
         return self.aes_cipher.decrypt(text)
