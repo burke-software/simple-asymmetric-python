@@ -7,7 +7,6 @@ Currently a work in progress and not publically vetted. Do not use unless you wi
 # To do
 
 - Get code peer reviewed
-- Set up travis CI
 - Port to javascript (with feature parity and interoperability)
 
 # Installation
