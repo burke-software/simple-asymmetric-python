@@ -1,5 +1,7 @@
 # simple-asymmetric-python
 
+[![Build Status](https://travis-ci.org/burke-software/simple-asymmetric-python.svg?branch=master)](https://travis-ci.org/burke-software/simple-asymmetric-python)
+
 An easy way to do combined AES and RSA encryption with python
 
 Currently a work in progress and not publically vetted. Do not use unless you wish to inspect the underlying code and verify it is secure.
@@ -10,8 +12,6 @@ Currently a work in progress and not publically vetted. Do not use unless you wi
 - Port to javascript (with feature parity and interoperability)
 
 # Installation
-
-Will place on pypi soon 
 
 `pip install simple-asymmetric`
 
