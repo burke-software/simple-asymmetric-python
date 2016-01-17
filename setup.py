@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="simple-asymmetric",
-    version="0.1",
+    version="0.2",
     author="David Burke",
     author_email="david@burkesoftware.com",
     description=("An easy way to do combined AES and RSA encryption with python"),
