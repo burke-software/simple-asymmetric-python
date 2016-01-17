@@ -172,13 +172,31 @@ class AsymCrypt():
         self.aes_key = aes_key
         self.aes_cipher = Fernet(self.aes_key)
 
-    def set_aes_key_from_encrypted(self, ciphertext):
+    def set_aes_key_from_encrypted(self, ciphertext, use_base64=False):
+        """ Set aes_key from an encrypted key
+        A shortcut method for receiving a AES key that was encrypted for our
+        RSA public key
+
+        :param ciphertext: Encrypted version of the key (bytes or base64 string)
+        :param use_base64: If true, decode the base64 string
+        """
+        if use_base64 is True:
+            ciphertext = base64.b64decode(ciphertext)
         aes_key = self.rsa_decrypt(ciphertext)
         self.set_aes_key(aes_key)
 
-    def get_encrypted_aes_key(self, public_key):
+    def get_encrypted_aes_key(self, public_key, use_base64=False):
+        """ Get encrypted aes_key using specified public_key
+        A shortcut method for sharing a AES key.
+
+        :param public_key: The public key we want to encrypt for
+        :param use_base64: Will result in the returned key to be base64 encoded
+        :rtype: encrypted key (bytes or base64 string"""
         public_asym = AsymCrypt(public_key=public_key)
-        return public_asym.rsa_encrypt(self.aes_key)
+        encrypted_key = public_asym.rsa_encrypt(self.aes_key)
+        if use_base64 is True:
+            encrypted_key = base64.b64encode(encrypted_key)
+        return encrypted_key
 
     def make_aes_key(self):
         """ Generate a new AES key
