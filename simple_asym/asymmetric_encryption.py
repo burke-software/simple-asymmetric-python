@@ -11,6 +11,9 @@ from .exceptions import (
     MissingAESException, MissingRSAPrivateException, MissingRSAPublicException)
 
 
+DEFAULT_MODULUS = 4096
+
+
 class AsymCrypt():
     aes_cipher = None
 
@@ -51,7 +54,7 @@ class AsymCrypt():
             pass
         return text
 
-    def make_rsa_keys(self, passphrase=None, bits=4096):
+    def make_rsa_keys(self, passphrase=None, bits=DEFAULT_MODULUS):
         """ Create new rsa private and public keys
 
         :param passphrase: Optional RSA private key passphrase. Returns encrypted
@@ -84,7 +87,7 @@ class AsymCrypt():
         )
         return private, public
 
-    def make_rsa_keys_with_passphrase(self, bits=4096):
+    def make_rsa_keys_with_passphrase(self, bits=DEFAULT_MODULUS):
         """ Wrapper around make_rsa_keys that also generates a passphrase
 
         :param bits: Bits for pycrypto's generate function. Safe to ignore.

@@ -18,7 +18,7 @@ setup(
         'Intended Audience :: Developers',
     ],
     install_requires=[
-        'cryptography',
+        'cryptography>=1.3.2',
     ],
     test_suite="tests",
 )
