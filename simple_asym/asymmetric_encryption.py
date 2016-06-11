@@ -1,6 +1,7 @@
 import base64
 import random
 import string
+import typing
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import serialization, hashes
@@ -14,8 +15,13 @@ from .exceptions import (
 DEFAULT_MODULUS = 4096
 
 
+RSAKey = typing.TypeVar('RSAKey')
+
+
 class AsymCrypt():
     aes_cipher = None
+    public_key = None
+    private_key = None
 
     def __init__(self, aes_key=None, public_key=None, private_key=None):
         """ A class to encrypt and decrypt using Asymmetrical encryption.
@@ -23,7 +29,7 @@ class AsymCrypt():
 
         :param aes_key: AES key used for symmetric encryption
         :param public_key: Public RSA key used for asymmetric encryption
-        "param private_key: Private RSA key used for asmmetric decryption
+        :param private_key: Private RSA key used for asymmetric decryption
         """
         if aes_key:
             self.set_aes_key(aes_key)
@@ -37,24 +43,24 @@ class AsymCrypt():
             label=None
         )
 
-    def _random_string(self, N):
+    def _random_string(self, n: int) -> str:
         return ''.join(random.SystemRandom().choice(
-            string.ascii_uppercase + string.digits) for _ in range(N))
+            string.ascii_uppercase + string.digits) for _ in range(n))
 
-    def _generate_key(self):
+    def _generate_key(self) -> bytes:
         return Fernet.generate_key()
 
-    def _generate_passphrase(self, N=255):
-        return self._random_string(N)
+    def _generate_passphrase(self, n=255) -> str:
+        return self._random_string(n)
 
-    def _force_bytes(self, text):
+    def _force_bytes(self, text: typing.Union[str, bytes]) -> bytes:
         try:  # Encode if not already done
             text = text.encode()
         except AttributeError:
             pass
         return text
 
-    def make_rsa_keys(self, passphrase=None, bits=DEFAULT_MODULUS):
+    def make_rsa_keys(self, passphrase=None, bits=DEFAULT_MODULUS) -> typing.Tuple[bytes, bytes]:
         """ Create new rsa private and public keys
 
         :param passphrase: Optional RSA private key passphrase. Returns encrypted
@@ -72,12 +78,14 @@ class AsymCrypt():
             encryption_alg = serialization.BestAvailableEncryption(
                 passphrase.encode()
             )
+            _format = serialization.PrivateFormat.PKCS8
         else:
             encryption_alg = serialization.NoEncryption()
+            _format = serialization.PrivateFormat.TraditionalOpenSSL
 
         private = self.private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
+            format=_format,
             encryption_algorithm=encryption_alg
         )
 
@@ -87,7 +95,7 @@ class AsymCrypt():
         )
         return private, public
 
-    def make_rsa_keys_with_passphrase(self, bits=DEFAULT_MODULUS):
+    def make_rsa_keys_with_passphrase(self, bits=DEFAULT_MODULUS) -> typing.Tuple[bytes, bytes, str]:
         """ Wrapper around make_rsa_keys that also generates a passphrase
 
         :param bits: Bits for pycrypto's generate function. Safe to ignore.
@@ -96,14 +104,14 @@ class AsymCrypt():
         private, public = self.make_rsa_keys(passphrase=passphrase, bits=bits)
         return private, public, passphrase
 
-    def rsa_encrypt(self, text, use_base64=False):
+    def rsa_encrypt(self, text: typing.Union[str, bytes], use_base64=False) -> bytes:
         """ Convert plain text to ciphertext
 
-        :param text: Plaintext to encrypt
+        :param text: Plaintext to encrypt. Accepts str or bytes
         :param use_base64: set True to return a base64 encoded unicode string
         (just for convenience)
         :type use_base64: Boolean
-        :rtype: ciphertext string
+        :rtype: ciphertext bytes
         """
         text = self._force_bytes(text)
         if not self.public_key:
@@ -113,33 +121,34 @@ class AsymCrypt():
             self._get_padding()
         )
         if use_base64 is True:
-            ciphertext = base64.b64encode(ciphertext).decode()
+            ciphertext = base64.b64encode(ciphertext)
         return ciphertext
 
-    def rsa_decrypt(self, ciphertext, use_base64=False):
+    def rsa_decrypt(self, ciphertext: bytes, use_base64=False) -> bytes:
         """ Convert ciphertext into plaintext
 
         :param ciphertext: Ciphertext to decrypt
         :param use_base64: set True to return a base64 encoded unicode string
         (just for convenience)
         :type use_base64: Boolean
-        :rtype: plaintext string
+        :rtype: plaintext bytes
         """
 
         if use_base64 is True:
             ciphertext = base64.b64decode(ciphertext)
         if not self.private_key:
             raise MissingRSAPrivateException
-        return self.private_key.decrypt(
+        plaintext = self.private_key.decrypt(
             ciphertext,
             self._get_padding()
         )
+        return plaintext
 
-    def set_private_key(self, private_key, passphrase=None):
+    def set_private_key(self, private_key: typing.Union[bytes, str, RSAKey], passphrase=None) -> RSAKey:
         """ Set private key
 
         :param private_key: String or RSAPrivateKey object
-        :param passphrase: Optional passphrase for encrpyting the RSA private key
+        :param passphrase: Optional passphrase for encrypting the RSA private key
         :rtype: private key
         """
         if isinstance(private_key, (bytes, str)):
@@ -155,7 +164,7 @@ class AsymCrypt():
             self.private_key = private_key
         return self.private_key
 
-    def set_public_key(self, public_key):
+    def set_public_key(self, public_key: typing.Union[bytes, str, RSAKey]) -> RSAKey:
         """ Set public key
 
         :param public_key: String or RSAPublicKey object
@@ -171,11 +180,11 @@ class AsymCrypt():
             self.public_key = public_key
         return self.public_key
 
-    def set_aes_key(self, aes_key):
+    def set_aes_key(self, aes_key: bytes):
         self.aes_key = aes_key
         self.aes_cipher = Fernet(self.aes_key)
 
-    def set_aes_key_from_encrypted(self, ciphertext, use_base64=False):
+    def set_aes_key_from_encrypted(self, ciphertext: bytes, use_base64=False):
         """ Set aes_key from an encrypted key
         A shortcut method for receiving a AES key that was encrypted for our
         RSA public key
@@ -188,7 +197,9 @@ class AsymCrypt():
         aes_key = self.rsa_decrypt(ciphertext)
         self.set_aes_key(aes_key)
 
-    def get_encrypted_aes_key(self, public_key, use_base64=False):
+    def get_encrypted_aes_key(self,
+                              public_key: typing.Union[bytes, str, RSAKey],
+                              use_base64=False) -> bytes:
         """ Get encrypted aes_key using specified public_key
         A shortcut method for sharing a AES key.
 
@@ -201,7 +212,7 @@ class AsymCrypt():
             encrypted_key = base64.b64encode(encrypted_key)
         return encrypted_key
 
-    def make_aes_key(self):
+    def make_aes_key(self) -> bytes:
         """ Generate a new AES key
 
         :rtype: AES key string
@@ -210,21 +221,21 @@ class AsymCrypt():
         self.set_aes_key(key)
         return key
 
-    def encrypt(self, text):
+    def encrypt(self, plaintext: typing.Union[str, bytes]) -> bytes:
         """ Encrypt text using AES encryption.
         Requires public_key and aes_key to be set. aes_key may be generated with
         AsymCrypt.make_aes_key if you do not already have one.
 
-        :param text: text to encrypt
+        :param plaintext: text to encrypt
         :rtype: ciphertext string
         """
-        text = self._force_bytes(text)
+        plaintext = self._force_bytes(plaintext)
         if not self.aes_cipher:
             raise MissingAESException
-        return self.aes_cipher.encrypt(text)
+        return self.aes_cipher.encrypt(plaintext)
 
-    def decrypt(self, text):
-        """ Decrypt ciphertext using AES encrpytion.
+    def decrypt(self, text: bytes):
+        """ Decrypt ciphertext using AES encryption.
         Requires private_key and aes_key to be set. aes_key may have been
         generated with AsymCrypt.make_aes_key which should have been done at
         time or encryption.

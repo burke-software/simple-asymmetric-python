@@ -25,6 +25,63 @@ class TestAsymCrypt(unittest.TestCase):
         decrypted_msg = alice.decrypt(msg_ciphertext).decode()
         self.assertEqual(decrypted_msg, msg)
 
+    def test_bob_alice_base64(self):
+        bob = AsymCrypt()
+        alice = AsymCrypt()
+        bob.make_rsa_keys(bits=2048)
+        alice.make_rsa_keys(bits=2048)
+        bob.make_aes_key()
+
+        shared_encrypted_aes = bob.get_encrypted_aes_key(alice.public_key, True)
+        alice.set_aes_key_from_encrypted(shared_encrypted_aes, True)
+
+        msg = "hello"
+        msg_ciphertext = bob.encrypt(msg)
+        self.assertNotEqual(msg_ciphertext, msg)
+        decrypted_msg = alice.decrypt(msg_ciphertext).decode()
+        self.assertEqual(decrypted_msg, msg)
+
+    def test_return_data(self):
+        """ This tests that key data is returned and able to be decoded for
+        storage.
+        Might be useful to gather generated key and ciphertext data in other
+        tests
+        """
+        bob = AsymCrypt()
+        alice = AsymCrypt()
+
+        bob_keys = bob.make_rsa_keys(bits=2048)
+        self.assertIn('PRIVATE', bob_keys[0].decode())
+        self.assertIn('PUBLIC', bob_keys[1].decode())
+
+        alice_passphrase = '123456'
+        alice_keys = alice.make_rsa_keys(bits=2048, passphrase=alice_passphrase)
+        self.assertIn('PRIVATE', alice_keys[0].decode())
+        self.assertIn('PUBLIC', alice_keys[1].decode())
+
+        aes_key = bob.make_aes_key()
+        self.assertTrue(aes_key.decode())
+
+        aes_ciphertext = bob.get_encrypted_aes_key(alice.public_key, True)
+        self.assertTrue(aes_ciphertext.decode())
+        alice.set_aes_key_from_encrypted(aes_ciphertext, True)
+
+        msg = "hello"
+        msg_ciphertext = bob.encrypt(msg)
+        self.assertTrue(msg_ciphertext.decode())
+        decrypted_msg = alice.decrypt(msg_ciphertext).decode()
+        self.assertTrue(decrypted_msg)
+
+        print(bob_keys[0].decode())
+        print(bob_keys[1].decode())
+        print(alice_passphrase)
+        print(alice_keys[0].decode())
+        print(alice_keys[1].decode())
+        print(aes_key.decode())
+        print(aes_ciphertext.decode())
+        print(msg_ciphertext.decode())
+        print(decrypted_msg)
+
     def test_encrypt_decrypt(self):
         asym = AsymCrypt(aes_key=self.aes_key,
                          public_key=self.public_key,
@@ -43,6 +100,21 @@ class TestAsymCrypt(unittest.TestCase):
         asym.set_private_key(private, passphrase=passphrase)
         self.assertTrue(self.private_key)
 
+    def test_unencrypted_rsa_private_key(self):
+        asym = AsymCrypt()
+        private, public = asym.make_rsa_keys()
+
+        asym = AsymCrypt()
+        asym.set_private_key(private)
+        asym.set_public_key(public)
+        self.assertTrue(self.private_key)
+        msg = 'hello'
+        ciphertext = asym.rsa_encrypt(msg)
+        self.assertNotEqual(ciphertext, msg)
+        plaintext = asym.rsa_decrypt(ciphertext).decode()
+        self.assertEqual(msg, plaintext)
+
+
     def test_exceptions(self):
         asym = AsymCrypt()
 
@@ -50,10 +122,10 @@ class TestAsymCrypt(unittest.TestCase):
             asym.encrypt('foo')
 
         with self.assertRaises(MissingAESException):
-            asym.decrypt('foo')
+            asym.decrypt(b'foo')
 
         with self.assertRaises(MissingRSAPublicException):
             asym.rsa_encrypt('foo')
 
         with self.assertRaises(MissingRSAPrivateException):
-            asym.rsa_decrypt('foo')
+            asym.rsa_decrypt(b'foo')
